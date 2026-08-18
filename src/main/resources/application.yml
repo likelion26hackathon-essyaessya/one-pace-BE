@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: onepace
+
+openai:
+  api-key: ${OPENAI_API_KEY}
+  model: ${OPENAI_MODEL:gpt-4o-mini}
+
+app:
+  frontend-url: ${FRONTEND_URL:}

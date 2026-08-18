@@ -44,4 +44,13 @@ public class ActionItem {
     @Builder.Default
     @Column(name = "status", length = 20)
     private String status = "OPEN";
+
+    @Column(name = "urgency", length = 20)
+    private String urgency;
+
+    @Column(name = "approval_status", length = 20)
+    private String approvalStatus;
+
+    @Column(name = "feedback_status", length = 20)
+    private String feedbackStatus;
 }

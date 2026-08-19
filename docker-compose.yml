@@ -34,7 +34,7 @@ services:
       - app-net
 
   app:
-    build: .
+    image: ghcr.io/likelion26hackathon-essyaessya/one-pace-be:latest
     restart: always
     depends_on:
       mysql:

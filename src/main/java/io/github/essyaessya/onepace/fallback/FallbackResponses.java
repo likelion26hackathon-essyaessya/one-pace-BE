@@ -25,8 +25,9 @@ public final class FallbackResponses {
         return new MeetingSummaryResponse(
                 null,
                 "논의된 내용을 바탕으로 다음 일정과 담당자가 정리되었습니다.",
+                "논의된 업무의 산출물을 확정하고 공유한다",
                 List.of(new DecisionDto("다음 주까지 산출물을 확정한다", "팀 리드")),
-                List.of(new ActionItemDto("산출물 정리 및 공유", "담당자", "다음 마감일"))
+                List.of(new ActionItemDto("산출물 정리 및 공유", "담당자", "다음 마감일", "보통", "대기", "미반영"))
         );
     }
 }

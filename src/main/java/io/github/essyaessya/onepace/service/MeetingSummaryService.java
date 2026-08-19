@@ -23,8 +23,15 @@ import org.springframework.stereotype.Service;
 public class MeetingSummaryService {
 
     private static final String SYSTEM_PROMPT =
-            "너는 팀 대화 내용에서 핵심을 요약하고, 결정된 사항과 아직 처리되지 않은 업무(미결 업무)를 추출하는 어시스턴트야. "
-                    + "담당자와 기한이 대화에 명시되어 있으면 반드시 포함시켜. 담당자/기한이 불명확하면 빈 문자열로 반환해.";
+            "너는 팀 대화 내용에서 핵심을 요약하고, 회의의 목표, 결정된 사항, 아직 처리되지 않은 업무(미결 업무)를 추출하는 어시스턴트야. "
+                    + "goal에는 이 회의/대화가 달성하려는 핵심 목표를 한 문장으로 정리해. "
+                    + "담당자와 기한이 대화에 명시되어 있으면 반드시 포함시켜. 담당자/기한이 불명확하면 빈 문자열로 반환해. "
+                    + "각 actionItem마다 urgency(긴급도: 낮음/보통/높음), approvalStatus(승인 상태: 대기/검토 중/승인 완료/반려), "
+                    + "feedbackStatus(피드백 상태: 미반영/반영 중/반영 완료)를 대화 맥락에서 판단해서 채워. "
+                    + "명시적 근거가 없으면 urgency는 '보통', approvalStatus는 '대기', feedbackStatus는 '미반영'으로 기본값을 사용해."
+                    + "dueDate를 계산할 때는 순서대로 생각해. 먼저 기준이 되는 메시지의 timestamp 날짜가 무슨 요일인지 정확히 계산해. "
+                    + "그다음 '이번 주 O요일'이면 그 요일이 기준일과 같은 주 중 언제인지, '다음 주 O요일'이면 기준일이 속한 주가 끝난 바로 다음 주의 그 요일이 며칠인지 하나씩 세어서 계산해. "
+                    + "이렇게 계산한 정확한 날짜만 YYYY-MM-DD 형식으로 dueDate에 채우고, 절대 대략적으로 추측하지 마.";
 
     private static final String SCHEMA_NAME = "meeting_summary_result";
 
@@ -40,12 +47,15 @@ public class MeetingSummaryService {
 
     private static final Map<String, Object> ACTION_ITEM_SCHEMA = Map.of(
             "type", "object",
-            "properties", Map.of(
-                    "title", Map.of("type", "string"),
-                    "assignee", Map.of("type", "string"),
-                    "dueDate", Map.of("type", "string")
+            "properties", Map.ofEntries(
+                    Map.entry("title", Map.of("type", "string")),
+                    Map.entry("assignee", Map.of("type", "string")),
+                    Map.entry("dueDate", Map.of("type", "string")),
+                    Map.entry("urgency", Map.of("type", "string", "enum", List.of("낮음", "보통", "높음"))),
+                    Map.entry("approvalStatus", Map.of("type", "string", "enum", List.of("대기", "검토 중", "승인 완료", "반려"))),
+                    Map.entry("feedbackStatus", Map.of("type", "string", "enum", List.of("미반영", "반영 중", "반영 완료")))
             ),
-            "required", List.of("title", "assignee", "dueDate"),
+            "required", List.of("title", "assignee", "dueDate", "urgency", "approvalStatus", "feedbackStatus"),
             "additionalProperties", false
     );
 
@@ -53,10 +63,11 @@ public class MeetingSummaryService {
             "type", "object",
             "properties", Map.of(
                     "summary", Map.of("type", "string"),
+                    "goal", Map.of("type", "string"),
                     "decisions", Map.of("type", "array", "items", DECISION_ITEM_SCHEMA),
                     "actionItems", Map.of("type", "array", "items", ACTION_ITEM_SCHEMA)
             ),
-            "required", List.of("summary", "decisions", "actionItems"),
+            "required", List.of("summary", "goal", "decisions", "actionItems"),
             "additionalProperties", false
     );
 
@@ -70,12 +81,16 @@ public class MeetingSummaryService {
             Map<String, Object> result = openAiClient.callStructured(SYSTEM_PROMPT, userMessage, SCHEMA_NAME, SCHEMA);
 
             String summary = (String) result.get("summary");
+            String goal = (String) result.get("goal");
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> decisionMaps = (List<Map<String, Object>>) result.get("decisions");
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> actionItemMaps = (List<Map<String, Object>>) result.get("actionItems");
 
-            MeetingSummaryLog meetingSummaryLog = MeetingSummaryLog.builder().summaryText(summary).build();
+            MeetingSummaryLog meetingSummaryLog = MeetingSummaryLog.builder()
+                    .summaryText(summary)
+                    .goal(goal)
+                    .build();
 
             for (Map<String, Object> d : decisionMaps) {
                 meetingSummaryLog.addDecision(Decision.builder()
@@ -89,6 +104,9 @@ public class MeetingSummaryService {
                         .title((String) a.get("title"))
                         .assignee((String) a.get("assignee"))
                         .dueDate((String) a.get("dueDate"))
+                        .urgency((String) a.get("urgency"))
+                        .approvalStatus((String) a.get("approvalStatus"))
+                        .feedbackStatus((String) a.get("feedbackStatus"))
                         .build());
             }
 
@@ -118,8 +136,9 @@ public class MeetingSummaryService {
                 .map(d -> new DecisionDto(d.getDecisionText(), d.getDecidedBy()))
                 .toList();
         List<ActionItemDto> actionItems = entity.getActionItems().stream()
-                .map(a -> new ActionItemDto(a.getTitle(), a.getAssignee(), a.getDueDate()))
+                .map(a -> new ActionItemDto(a.getTitle(), a.getAssignee(), a.getDueDate(),
+                        a.getUrgency(), a.getApprovalStatus(), a.getFeedbackStatus()))
                 .toList();
-        return new MeetingSummaryResponse(entity.getId(), entity.getSummaryText(), decisions, actionItems);
+        return new MeetingSummaryResponse(entity.getId(), entity.getSummaryText(), entity.getGoal(), decisions, actionItems);
     }
 }

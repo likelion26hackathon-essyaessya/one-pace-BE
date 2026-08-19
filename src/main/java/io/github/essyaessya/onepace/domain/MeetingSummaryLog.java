@@ -34,6 +34,9 @@ public class MeetingSummaryLog {
     @Column(name = "summary_text", columnDefinition = "TEXT")
     private String summaryText;
 
+    @Column(name = "goal", columnDefinition = "TEXT")
+    private String goal;
+
     @CreationTimestamp
     @Column(name = "created_at")
     private LocalDateTime createdAt;

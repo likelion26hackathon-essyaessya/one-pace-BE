@@ -38,6 +38,19 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 배포 설정 파일 서버로 전송 (docker-compose.yml)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "docker-compose.yml"
+          target: "~/onepace"
+          strip_components: 0
+
       - name: 서버에서 pull 및 재기동
         uses: appleboy/ssh-action@v1.0.3
         with:

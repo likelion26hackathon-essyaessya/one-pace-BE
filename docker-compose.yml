@@ -1,4 +1,19 @@
 services:
+  nginx:
+    image: nginx:1.27-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    depends_on:
+      - app
+    networks:
+      - app-net
+
   mysql:
     image: mysql:8.0
     restart: always
@@ -9,13 +24,14 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
     volumes:
       - mysql_data:/var/lib/mysql
-    ports:
-      - "3306:3306"
+    # 호스트에 포트 노출하지 않음 - app 컨테이너가 도커 내부 네트워크(mysql:3306)로만 접근
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - app-net
 
   app:
     build: .
@@ -31,8 +47,14 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL}
       FRONTEND_URL: ${FRONTEND_URL}
-    ports:
-      - "8080:8080"
+    # 호스트에 포트 노출하지 않음 - nginx가 도커 내부 네트워크(app:8080)로만 프록시
+    expose:
+      - "8080"
+    networks:
+      - app-net
+
+networks:
+  app-net:
 
 volumes:
   mysql_data:

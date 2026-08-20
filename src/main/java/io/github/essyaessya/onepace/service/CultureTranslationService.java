@@ -23,9 +23,13 @@ public class CultureTranslationService {
                     + "감지된 표현·실시간 탐지 메시지·예상 뉘앙스·대체 표현을 제시해. "
                     + "판단 기준: 명령조 지시, 직설적인 긴급 요구, 무례하게 들릴 수 있는 표현만 riskDetected를 true로 판단해. "
                     + "이미 정중한 부탁 표현(예: Could you kindly, Apologies for, whenever you have a moment 등 완곡어법)이 "
-                    + "포함된 문장은 riskDetected를 false로 반환하고 detectedExpression/realtimeDetection/nuanceExplanation/suggestedText는 빈 문자열로 반환해. "
-                    + "riskDetected가 true인 경우 realtimeDetection은 감지된 위험을 요약한 한 문장만 작성해 "
-                    + "(예: \"직설적인 독촉 표현 감지됨.\"). \"실시간 탐지:\" 같은 접두어는 붙이지 마. "
+                    + "포함된 문장은 riskDetected를 false로 반환하고 detectedExpression/nuanceExplanation/suggestedText는 빈 문자열로, "
+                    + "realtimeDetection은 빈 배열([])로 반환해. "
+                    + "riskDetected가 true인 경우 realtimeDetection은 위험하다고 판단한 표현들을 원문 메시지에 등장하는 그대로 "
+                    + "(대소문자·띄어쓰기·구두점까지 한 글자도 바꾸지 말고) 부분 문자열로 추출해서 배열로 반환해. "
+                    + "위험한 표현이 문장 안에서 서로 떨어져 있으면(예: \"urgent\"와 \"right now\"가 떨어져 있는 경우) 하나로 이어붙이지 말고 "
+                    + "각각을 배열의 별도 원소로 나눠서 반환해. 요약하거나 설명을 덧붙이거나 다른 언어로 옮기지 마 — 프론트엔드가 각 원소로 "
+                    + "원문 텍스트에서 위치를 찾아 밑줄을 긋기 때문에, 원문에 정확히 존재하지 않는 문구를 반환하면 절대 안 돼. "
                     + "suggestedText는 반드시 원문(메시지)과 동일한 언어로 작성해. 원문이 한국어면 한국어로, 영어면 영어로 제안해. "
                     + "다른 언어로 번역하지 말고 같은 언어 안에서 더 정중하고 완곡한 표현으로만 다듬어. "
                     + "같은 문장은 항상 같은 결과로 판단해서 일관성을 유지해.";
@@ -37,7 +41,7 @@ public class CultureTranslationService {
             "properties", Map.of(
                     "riskDetected", Map.of("type", "boolean"),
                     "detectedExpression", Map.of("type", "string"),
-                    "realtimeDetection", Map.of("type", "string"),
+                    "realtimeDetection", Map.of("type", "array", "items", Map.of("type", "string")),
                     "nuanceExplanation", Map.of("type", "string"),
                     "suggestedText", Map.of("type", "string")
             ),
@@ -62,7 +66,8 @@ public class CultureTranslationService {
 
             boolean riskDetected = (boolean) result.get("riskDetected");
             String detectedExpression = (String) result.get("detectedExpression");
-            String realtimeDetection = (String) result.get("realtimeDetection");
+            @SuppressWarnings("unchecked")
+            List<String> realtimeDetection = (List<String>) result.get("realtimeDetection");
             String nuanceExplanation = (String) result.get("nuanceExplanation");
             String suggestedText = (String) result.get("suggestedText");
 
@@ -71,7 +76,7 @@ public class CultureTranslationService {
                     .counterpartCountry(request.counterpartCountry())
                     .riskDetected(riskDetected)
                     .detectedExpression(detectedExpression)
-                    .realtimeDetection(realtimeDetection)
+                    .realtimeDetection(String.join(" | ", realtimeDetection))
                     .nuanceExplanation(nuanceExplanation)
                     .suggestedText(suggestedText)
                     .build());

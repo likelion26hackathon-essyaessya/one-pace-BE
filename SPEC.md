@@ -40,7 +40,7 @@ OPENAI_MODEL=gpt-4o-mini     # 기본값, 필요시 gpt-4o로 교체
 DB_URL=jdbc:mysql://localhost:3306/onepace
 DB_USERNAME=
 DB_PASSWORD=
-FRONTEND_URL=                # CORS 허용 도메인
+FRONTEND_URL=                # CORS 허용 도메인 (콤마로 여러 개 구분)
 SPRING_PROFILES_ACTIVE=prod  # 로컬 개발 시 local
 ```
 

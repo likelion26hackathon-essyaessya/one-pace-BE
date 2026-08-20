@@ -7,6 +7,7 @@ import io.github.essyaessya.onepace.fallback.FallbackResponses;
 import io.github.essyaessya.onepace.repository.CultureTranslationLogRepository;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -47,11 +48,17 @@ public class CultureTranslationService {
     private final OpenAiClient openAiClient;
     private final CultureTranslationLogRepository repository;
 
+    // 동일한 (메시지, 상대 국가) 입력은 항상 같은 결과를 반환하도록 설계돼 있어(SYSTEM_PROMPT 참고),
+    // 캐시로 재사용해도 정확도 손실 없이 OpenAI 호출 횟수(RPM/RPD 한도)를 줄일 수 있음
+    private final Map<String, Map<String, Object>> resultCache = new ConcurrentHashMap<>();
+
     public CultureTranslationResponse analyze(CultureTranslationRequest request) {
         try {
             String userMessage = "메시지: " + request.text() + "\n상대 국가 코드(ISO 3166-1 alpha-2): " + request.counterpartCountry();
+            String cacheKey = request.counterpartCountry() + "|" + request.text();
 
-            Map<String, Object> result = openAiClient.callStructured(SYSTEM_PROMPT, userMessage, SCHEMA_NAME, SCHEMA);
+            Map<String, Object> result = resultCache.computeIfAbsent(cacheKey,
+                    key -> openAiClient.callStructured(SYSTEM_PROMPT, userMessage, SCHEMA_NAME, SCHEMA));
 
             boolean riskDetected = (boolean) result.get("riskDetected");
             String detectedExpression = (String) result.get("detectedExpression");

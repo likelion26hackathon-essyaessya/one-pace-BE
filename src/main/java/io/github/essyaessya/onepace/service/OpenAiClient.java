@@ -6,10 +6,14 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+@Slf4j
 @Component
 public class OpenAiClient {
 
@@ -43,19 +47,41 @@ public class OpenAiClient {
                 )
         );
 
-        String rawResponse = openAiWebClient.post()
-                .uri("/chat/completions")
-                .bodyValue(requestBody)
-                .retrieve()
-                .bodyToMono(String.class)
-                .timeout(Duration.ofSeconds(10))
-                .block();
+        log.info("OpenAI 요청 시작: model={}, schema={}", model, schemaName);
+        long startedAt = System.currentTimeMillis();
+        String rawResponse;
+        try {
+            rawResponse = openAiWebClient.post()
+                    .uri("/chat/completions")
+                    .bodyValue(requestBody)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .timeout(Duration.ofSeconds(10))
+                    .block();
+        } catch (WebClientResponseException e) {
+            log.error("OpenAI 요청 실패: model={}, schema={}, elapsedMs={}, status={}, responseBody={}",
+                    model, schemaName, System.currentTimeMillis() - startedAt,
+                    e.getStatusCode(), e.getResponseBodyAsString(), e);
+            throw e;
+        } catch (WebClientRequestException e) {
+            log.error("OpenAI 요청 실패(네트워크 오류): model={}, schema={}, elapsedMs={}, cause={}",
+                    model, schemaName, System.currentTimeMillis() - startedAt, e.getMessage(), e);
+            throw e;
+        } catch (Exception e) {
+            log.error("OpenAI 요청 실패(타임아웃/기타): model={}, schema={}, elapsedMs={}",
+                    model, schemaName, System.currentTimeMillis() - startedAt, e);
+            throw e;
+        }
+
+        log.info("OpenAI 요청 성공: model={}, schema={}, elapsedMs={}",
+                model, schemaName, System.currentTimeMillis() - startedAt);
 
         try {
             JsonNode root = objectMapper.readTree(rawResponse);
             String content = root.at("/choices/0/message/content").asString();
             return objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
+            log.error("OpenAI 응답 파싱 실패: model={}, schema={}, rawResponse={}", model, schemaName, rawResponse, e);
             throw new IllegalStateException("Failed to parse OpenAI response", e);
         }
     }

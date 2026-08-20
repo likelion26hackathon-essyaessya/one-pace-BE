@@ -47,6 +47,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL}
       FRONTEND_URL: ${FRONTEND_URL}
+      FORCE_FALLBACK: ${FORCE_FALLBACK:-false}
     # 호스트에 포트 노출하지 않음 - nginx가 도커 내부 네트워크(app:8080)로만 프록시
     expose:
       - "8080"

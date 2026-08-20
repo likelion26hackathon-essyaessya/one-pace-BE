@@ -20,16 +20,24 @@ public class OpenAiClient {
     private final WebClient openAiWebClient;
     private final ObjectMapper objectMapper;
     private final String model;
+    private final boolean forceFallback;
 
     public OpenAiClient(WebClient openAiWebClient, ObjectMapper objectMapper,
-                         @Value("${openai.model}") String model) {
+                         @Value("${openai.model}") String model,
+                         @Value("${app.force-fallback:false}") boolean forceFallback) {
         this.openAiWebClient = openAiWebClient;
         this.objectMapper = objectMapper;
         this.model = model;
+        this.forceFallback = forceFallback;
     }
 
     public Map<String, Object> callStructured(String systemPrompt, String userMessage,
                                                 String schemaName, Map<String, Object> schema) {
+        if (forceFallback) {
+            log.warn("강제 fallback 모드(app.force-fallback=true) - OpenAI 호출 스킵: schema={}", schemaName);
+            throw new IllegalStateException("Force fallback mode is enabled");
+        }
+
         Map<String, Object> requestBody = Map.of(
                 "model", model,
                 "temperature", 0.2,

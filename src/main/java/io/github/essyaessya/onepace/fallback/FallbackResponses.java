@@ -15,7 +15,7 @@ public final class FallbackResponses {
                 null,
                 true,
                 "urgent, right now",
-                "직설적인 독촉 표현 감지됨.",
+                List.of("urgent", "right now"),
                 "직설적인 긴급 표현은 문화권에 따라 명령조로 받아들여질 수 있습니다.",
                 "Apologies for the rush, but whenever you have a quick moment, could you kindly take a look?"
         );

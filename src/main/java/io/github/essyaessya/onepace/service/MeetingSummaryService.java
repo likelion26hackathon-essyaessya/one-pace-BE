@@ -13,7 +13,10 @@ import io.github.essyaessya.onepace.repository.MeetingSummaryLogRepository;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Map;
@@ -86,6 +89,7 @@ public class MeetingSummaryService {
 
     private static final String[] DAY_NAMES = {"월", "화", "수", "목", "금", "토", "일"};
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final OpenAiClient openAiClient;
     private final MeetingSummaryLogRepository repository;
@@ -158,7 +162,7 @@ public class MeetingSummaryService {
                 .map(MessageDto::timestamp)
                 .filter(ts -> ts != null && !ts.isBlank())
                 .findFirst()
-                .map(ts -> LocalDateTime.parse(ts).toLocalDate())
+                .map(this::parseToLocalDate)
                 .orElse(LocalDate.now());
 
         LocalDate thisMonday = baseDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
@@ -180,6 +184,18 @@ public class MeetingSummaryService {
         sb.append("\n");
 
         return sb.toString();
+    }
+
+    /**
+     * 프론트가 UTC(Z) 오프셋이 붙은 ISO-8601과 오프셋 없는 순수 로컬 문자열을 섞어 보낼 수 있어
+     * 오프셋이 있으면 KST로 변환하고, 없으면 로컬 시간 그대로 파싱한다.
+     */
+    private LocalDate parseToLocalDate(String ts) {
+        try {
+            return OffsetDateTime.parse(ts).atZoneSameInstant(KST).toLocalDate();
+        } catch (DateTimeParseException e) {
+            return LocalDateTime.parse(ts).toLocalDate();
+        }
     }
 
     private void appendWeek(StringBuilder sb, LocalDate monday) {
